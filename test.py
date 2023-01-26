@@ -90,16 +90,27 @@ async def getChart2Data():
 
 @app.get("/getChart3Data")
 async def getChart3Data():
-    return {
-        "AUCHAN BIO": {
-            "nbr_prod": "5", "max": "7.96", "min": "2.35", "mean": "5.14", "nbr_avail": "5", "mean_rating": "3.6"
-        },
-        "USHUAIA": {
-            "nbr_prod": "2", "max": "10.99", "min": "10.99", "mean": "10.99", "nbr_avail": "2", "mean_rating": "4.7"
-        }
-    }
+
     cursor = connection.cursor()
-    cursor.execute("""SELECT* FROM product_data;""")
+    cursor.execute("""  SELECT brand, AVG(rating_value), AVG(price_unit), MAX(price_unit), MIN(price_unit), COUNT(*), COUNT(CASE WHEN availability THEN 1 END)
+                        FROM (  SELECT DISTINCT ON (url, timestamp) url, timestamp, brand, rating_value, price_unit, availability
+                                FROM product_data
+                                ORDER BY url, timestamp DESC) AS data
+                        GROUP BY brand
+                        ORDER BY COUNT(*) DESC
+                        LIMIT 2
+                        ;""")
+    elem_list = cursor.fetchall()
+    cursor.close()
+
+    return [{elem[0]: {
+                'nbr of products': elem[5],
+                'max price': elem[3],
+                'min price': elem[4],
+                'mean price': elem[2],
+                'nbr of available products': elem[6],
+                'rating': elem[1]
+            }} for elem in elem_list]
 
 @app.get("/getChart4Data")
 async def getChart4Data():
@@ -162,11 +173,11 @@ async def getNumber3():
                         FROM (  SELECT
                                 DISTINCT ON (url) url,
                                 timestamp,
-                                price_unit::float
+                                price_unit
                             FROM
                                 product_data
-                            WHERE
-                                price_unit is not null
+ 
+                               
                             ORDER BY
                                 url,
                                 timestamp DESC) AS prices;""")
