@@ -40,7 +40,8 @@ async def getChart1Data():
     cursor = connection.cursor()
     cursor.execute("""  SELECT brand, COUNT(*)
                         FROM (  SELECT DISTINCT url, brand
-                                FROM product_data) as brand_products
+                                FROM product_data
+                                WHERE brand is not null) as brand_products
                         GROUP BY brand
                         ORDER BY COUNT(*) DESC
                         LIMIT 7 ;""")
