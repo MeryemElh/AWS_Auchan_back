@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 import uvicorn
 from typing import List, Tuple
-
+import logging
+logger = logging.getLogger()
 
 app = FastAPI()
 
@@ -34,10 +35,28 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+def get_cursor():
+    global connection
+    
+    try:
+        cursor = connection.cursor()
+    except psycopg2.InterfaceError:
+        connection = psycopg2.connect(
+            host=pg_host,
+            database=pg_db,
+            user=pg_user,
+            password=pg_pwd,
+            options='-c statement_timeout=15000'
+        )
+        cursor = connection.cursor()
+    
+    return cursor
+
 
 @app.get("/getChart1Data")
 async def getChart1Data():
-    cursor = connection.cursor()
+    cursor = get_cursor()
+
     cursor.execute("""  SELECT brand, COUNT(*)
                         FROM (  SELECT DISTINCT url, brand
                                 FROM product_data
@@ -59,7 +78,7 @@ def get_parent(id: str, liste : List[Tuple[str]]):
 
 @app.get("/getChart2Data")
 async def getChart2Data():
-    cursor = connection.cursor()
+    cursor = get_cursor()
 
     cursor.execute("""  SELECT parent_category.name, COUNT(*)
                         FROM (  SELECT DISTINCT url, category_id
@@ -77,8 +96,8 @@ async def getChart2Data():
 
 @app.get("/getChart3Data")
 async def getChart3Data():
+    cursor = get_cursor()
 
-    cursor = connection.cursor()
     cursor.execute("""  SELECT brand, AVG(rating_value), AVG(price_unit), MAX(price_unit), MIN(price_unit), COUNT(*), COUNT(CASE WHEN availability THEN 1 END)
                         FROM (  SELECT DISTINCT ON (url, timestamp) url, timestamp, brand, rating_value, price_unit, availability
                                 FROM product_data
@@ -107,8 +126,8 @@ async def getChart3Data():
 
 @app.get("/getChart4Data")
 async def getChart4Data():
+    cursor = get_cursor()
 
-    cursor = connection.cursor()
     cursor.execute("""  SELECT parent_category.name, AVG(price_unit)
                         FROM (  SELECT DISTINCT ON (url) url, timestamp, category_id, price_unit::float
                                 FROM product_data
@@ -126,7 +145,8 @@ async def getChart4Data():
 
 @app.get("/getNumber1")
 async def getNumber1():
-    cursor = connection.cursor()
+    cursor = get_cursor()
+
     cursor.execute("""SELECT COUNT(*) FROM (SELECT DISTINCT availability, url FROM product_data) AS prods;""")
     res = cursor.fetchall()[0]
     cursor.close()
@@ -134,15 +154,21 @@ async def getNumber1():
 
 @app.get("/getNumber2")
 async def getNumber2():
-    cursor = connection.cursor()
+    cursor = get_cursor()
+
     cursor.execute("""SELECT COUNT(*) FROM (SELECT DISTINCT availability, url FROM product_data) AS prods WHERE availability = true;""")
     res = cursor.fetchall()[0]
     cursor.close()
     return res[0] if res else -1
 
+@app.get("/coupe", tags=['test'])
+async def coupe():
+    connection.close()
+
 @app.get("/getNumber3")
 async def getNumber3():
-    cursor = connection.cursor()
+    cursor = get_cursor()
+
     cursor.execute("""  SELECT AVG(price_unit)
                         FROM (  SELECT
                                 DISTINCT ON (url) url,
